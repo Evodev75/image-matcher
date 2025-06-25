@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 pillow
-tensorflow-cpu
-scipy
+imagehash
 python-multipart

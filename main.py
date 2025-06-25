@@ -1,32 +1,19 @@
 
 from fastapi import FastAPI, File, UploadFile
 from PIL import Image
-import numpy as np
-import uvicorn
+import imagehash
 import os
 import re
-from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.models import Model
-from scipy.spatial.distance import cosine
 
 app = FastAPI()
 
-# Charger le modèle MobileNetV2 sans la couche finale (embedding 1280D)
-base_model = MobileNetV2(weights='imagenet', include_top=False, pooling='avg')
-model = Model(inputs=base_model.input, outputs=base_model.output)
+# Fonction pour calculer le hash d'une image
+def get_image_hash(image: Image.Image) -> imagehash.ImageHash:
+    image = image.convert("L").resize((256, 256))
+    return imagehash.phash(image)
 
-# Fonction d'extraction d'embedding
-def get_embedding(image: Image.Image) -> np.ndarray:
-    image = image.convert("RGB").resize((224, 224))
-    img_array = img_to_array(image)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
-    embedding = model.predict(img_array, verbose=0)
-    return embedding[0]
-
-# Charger les images de référence
-REFERENCE_IMAGES = {}
+# Charger les images de référence avec leurs hashes
+REFERENCE_HASHES = {}
 REFERENCE_DIR = "reference_images"
 
 for filename in os.listdir(REFERENCE_DIR):
@@ -37,26 +24,24 @@ for filename in os.listdir(REFERENCE_DIR):
         img_id = match.group(1)
         img_path = os.path.join(REFERENCE_DIR, filename)
         img = Image.open(img_path)
-        embedding = get_embedding(img)
-        REFERENCE_IMAGES[img_id] = embedding
+        hash_val = get_image_hash(img)
+        REFERENCE_HASHES[img_id] = hash_val
 
 @app.post("/match")
 async def match_image(file: UploadFile = File(...)):
     uploaded_img = Image.open(file.file)
-    uploaded_embedding = get_embedding(uploaded_img)
+    uploaded_hash = get_image_hash(uploaded_img)
 
     best_match_id = None
-    best_score = float("inf")
+    best_distance = float("inf")
 
-    for ref_id, ref_embedding in REFERENCE_IMAGES.items():
-        score = cosine(ref_embedding, uploaded_embedding)
-        if score < best_score:
-            best_score = score
+    for ref_id, ref_hash in REFERENCE_HASHES.items():
+        distance = uploaded_hash - ref_hash  # Hamming distance
+        if distance < best_distance:
+            best_distance = distance
             best_match_id = ref_id
-
-    similarity = 1 - best_score  # 1 = parfait, 0 = orthogonal
 
     return {
         "match_id": best_match_id,
-        "similarity": similarity
+        "distance": best_distance  # 0 = identique, jusqu'à ~64 pour totalement différent
     }

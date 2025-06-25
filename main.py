@@ -33,11 +33,20 @@ async def match_image(file: UploadFile = File(...)):
 
     for ref_id, ref_arr in REFERENCE_IMAGES.items():
         try:
-            score = ssim(ref_arr, uploaded_arr)
+            if ref_arr.shape != uploaded_arr.shape:
+                resized = Image.fromarray(uploaded_arr).resize((ref_arr.shape[1], ref_arr.shape[0]))
+                uploaded_resized = np.array(resized)
+            else:
+                uploaded_resized = uploaded_arr
+
+            score = ssim(ref_arr, uploaded_resized)
             if score > best_score:
                 best_score = score
                 best_match_id = ref_id
         except Exception:
             continue
 
-    return {"match_id": best_match_id}
+    return {
+        "match_id": best_match_id,
+        "score": best_score
+    }

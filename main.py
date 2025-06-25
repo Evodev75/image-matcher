@@ -20,7 +20,7 @@ preprocess = transforms.Compose([
 ])
 
 # Charger MobileNetV2 sans la dernière couche (embedding)
-model = models.mobilenet_v2(pretrained=True)
+model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
 model.classifier = torch.nn.Identity()
 model.eval()
 
@@ -58,3 +58,9 @@ async def match(file: UploadFile = File(...)):
             best_match = ref_id
 
     return {"match_id": best_match, "score": best_score}
+
+# Ajout pour port binding correct sur Render
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

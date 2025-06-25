@@ -43,5 +43,5 @@ async def match_image(file: UploadFile = File(...)):
 
     return {
         "match_id": best_match_id,
-        "distance": best_distance  # 0 = identique, jusqu'à ~64 pour totalement différent
+        "distance": int(best_distance)  # ← conversion ici
     }

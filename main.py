@@ -1,13 +1,31 @@
 
 from fastapi import FastAPI, File, UploadFile
 from skimage.metrics import structural_similarity as ssim
-from PIL import Image
+from PIL import Image, ImageEnhance
 import numpy as np
 import uvicorn
 import os
 import re
 
 app = FastAPI()
+
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    # Étape 1 : améliorer le contraste
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2.0)
+
+    # Étape 2 : convertir en niveaux de gris si ce n’est pas déjà fait
+    if image.mode != 'L':
+        image = image.convert('L')
+
+    # Étape 3 : convertir en tableau numpy
+    img_array = np.array(image)
+
+    # Étape 4 : binarisation (optionnelle mais utile pour isoler les lignes)
+    threshold = 100
+    binary_img = (img_array > threshold).astype(np.uint8) * 255
+
+    return binary_img
 
 # Charger les images de référence une fois au démarrage
 REFERENCE_IMAGES = {}
@@ -20,13 +38,14 @@ for filename in os.listdir(REFERENCE_DIR):
     if match:
         img_id = match.group(1)
         img_path = os.path.join(REFERENCE_DIR, filename)
-        img = Image.open(img_path).convert('L')
-        REFERENCE_IMAGES[img_id] = np.array(img)
+        img = Image.open(img_path)
+        processed_img = preprocess_image(img)
+        REFERENCE_IMAGES[img_id] = processed_img
 
 @app.post("/match")
 async def match_image(file: UploadFile = File(...)):
-    uploaded_img = Image.open(file.file).convert('L')
-    uploaded_arr = np.array(uploaded_img)
+    uploaded_img = Image.open(file.file)
+    uploaded_arr = preprocess_image(uploaded_img)
 
     best_match_id = None
     best_score = -1

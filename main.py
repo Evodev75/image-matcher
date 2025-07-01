@@ -11,9 +11,10 @@ app = FastAPI()
 # Chemin vers les images de référence
 REFERENCE_DIR = "reference_images"
 
-# Prétraitement des images pour MobileNetV2
+# Prétraitement des images pour MobileNetV2 (en noir et blanc)
 preprocess = transforms.Compose([
     transforms.Resize((224, 224)),
+    transforms.Grayscale(num_output_channels=3),  # Conversion en N/B avec 3 canaux
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
@@ -43,7 +44,7 @@ for filename in os.listdir(REFERENCE_DIR):
 
 @app.post("/match")
 async def match(file: UploadFile = File(...)):
-    image = Image.open(file.file).convert("RGB")
+    image = Image.open(file.file).convert("L")  # Convertir l'image en niveaux de gris (L)
     tensor = preprocess(image).unsqueeze(0)
     with torch.no_grad():
         embedding = model(tensor).squeeze()
